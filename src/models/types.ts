@@ -46,3 +46,49 @@ export interface ClassificationResult {
   processingTimeMs: number;
   modelId: string;
 }
+
+// ── RAG Pipeline Types ────────────────────────────────────────────────────────
+
+export interface VectorDocument {
+  documentId: string;
+  content: string;
+  embedding: number[];
+  metadata?: Record<string, unknown>;
+  category?: DocumentCategory;
+}
+
+export interface IndexRequest {
+  documentId: string;
+  s3Key?: string;
+  content?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface IndexResponse {
+  documentId: string;
+  success: boolean;
+  embeddingDimensions: number;
+  category: DocumentCategory;
+  processingTimeMs: number;
+}
+
+export interface RAGQueryRequest {
+  query: string;
+  topK?: number;
+}
+
+export interface RetrievedDocument {
+  documentId: string;
+  content: string;
+  similarity: number;
+  metadata?: Record<string, unknown>;
+  category?: string;
+}
+
+export interface RAGQueryResponse {
+  query: string;
+  answer: string;
+  retrievedDocuments: RetrievedDocument[];
+  processingTimeMs: number;
+  modelId: string;
+}
