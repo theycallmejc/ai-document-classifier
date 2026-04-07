@@ -221,6 +221,22 @@ curl -X POST https://<api>/dev/index \
 
 ---
 
+### DELETE /documents/{documentId} — Remove from RAG index
+
+```bash
+curl -X DELETE https://<api>/dev/documents/invoice-jan-2024
+```
+
+```json
+{
+  "documentId": "invoice-jan-2024",
+  "deleted": true,
+  "message": "Document removed from the RAG index."
+}
+```
+
+---
+
 ### POST /query — Ask a question (RAG)
 
 ```bash
@@ -245,6 +261,43 @@ curl -X POST https://<api>/dev/query \
   "processingTimeMs": 2310,
   "modelId": "anthropic.claude-3-5-sonnet-20241022-v2:0"
 }
+```
+
+---
+
+## Running the Demo
+
+The demo script indexes 5 real sample documents (invoices, NDA, financial report, security email), fires 3 RAG queries, then cleans up.
+
+```bash
+# After deploying with Terraform:
+BASE_URL=https://<api-id>.execute-api.us-east-1.amazonaws.com/dev npm run demo
+```
+
+**Sample output:**
+```
+══════════════════════════════════════════════════════════
+  AI Document Classifier + RAG Pipeline — Demo
+══════════════════════════════════════════════════════════
+
+── STEP 1 / 3 — Indexing documents ──────────────────────
+  Indexing "demo-invoice-jan" ... ✓  category=INVOICE  dims=512  (1243ms)
+  Indexing "demo-invoice-mar" ... ✓  category=INVOICE  dims=512  (1187ms)
+  Indexing "demo-nda-acme"    ... ✓  category=LEGAL    dims=512  (1301ms)
+  Indexing "demo-report-q1"   ... ✓  category=REPORT   dims=512  (1089ms)
+  Indexing "demo-email-incident"..✓  category=EMAIL    dims=512  (1156ms)
+
+── STEP 2 / 3 — Running RAG queries ─────────────────────
+
+  [Invoice lookup]
+  Query: "Which invoices are due in 2024 and what are their totals?"
+  Answer: Based on [Document 1] and [Document 2], two invoices are due in 2024:
+    • Invoice #INV-2024-001 (Acme Software Solutions) — $9,180.00, due Feb 14
+    • Invoice #INV-2024-042 (DataPipeline Corp) — $19,000.00, due Apr 2
+
+── STEP 3 / 3 — Cleanup ─────────────────────────────────
+  Deleting "demo-invoice-jan" ... ✓
+  ...
 ```
 
 ---

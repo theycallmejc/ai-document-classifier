@@ -165,6 +165,20 @@ resource "aws_lambda_function" "query" {
   tags = local.tags
 }
 
+# ── Lambda: DELETE /documents/{documentId} ─────────────────────────────────────
+
+resource "aws_lambda_function" "deleter" {
+  filename      = "../../function.zip"
+  function_name = "${local.prefix}-deleter"
+  role          = aws_iam_role.lambda.arn
+  handler       = "handlers/deleteHandler.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 15
+  memory_size   = 256
+  environment { variables = local.lambda_env }
+  tags = local.tags
+}
+
 # ── API Gateway HTTP API ───────────────────────────────────────────────────────
 
 resource "aws_apigatewayv2_api" "main" {
@@ -206,6 +220,13 @@ resource "aws_apigatewayv2_integration" "query" {
   integration_method = "POST"
 }
 
+resource "aws_apigatewayv2_integration" "deleter" {
+  api_id             = aws_apigatewayv2_api.main.id
+  integration_type   = "AWS_PROXY"
+  integration_uri    = aws_lambda_function.deleter.invoke_arn
+  integration_method = "POST"
+}
+
 # Routes
 
 resource "aws_apigatewayv2_route" "classify" {
@@ -224,6 +245,12 @@ resource "aws_apigatewayv2_route" "query" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "POST /query"
   target    = "integrations/${aws_apigatewayv2_integration.query.id}"
+}
+
+resource "aws_apigatewayv2_route" "delete_document" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "DELETE /documents/{documentId}"
+  target    = "integrations/${aws_apigatewayv2_integration.deleter.id}"
 }
 
 # Lambda permissions
@@ -252,6 +279,14 @@ resource "aws_lambda_permission" "api_gw_query" {
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
 }
 
+resource "aws_lambda_permission" "api_gw_deleter" {
+  statement_id  = "AllowAPIGatewayDeleter"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.deleter.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+}
+
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "classify_endpoint" {
@@ -264,6 +299,10 @@ output "index_endpoint" {
 
 output "query_endpoint" {
   value = "${aws_apigatewayv2_stage.main.invoke_url}/query"
+}
+
+output "delete_endpoint" {
+  value = "${aws_apigatewayv2_stage.main.invoke_url}/documents/{documentId}"
 }
 
 output "vector_store_table" {
