@@ -47,6 +47,46 @@ export interface ClassificationResult {
   modelId: string;
 }
 
+// ── Job Fit Evaluator Types ───────────────────────────────────────────────────
+
+export type FitGrade = "A" | "A-" | "B+" | "B" | "B-" | "C+" | "C" | "C-" | "D" | "F";
+export type FitRecommendation = "APPLY" | "MAYBE" | "SKIP";
+
+export interface JobFitRequest {
+  jobDescription: string;
+  resumeText: string;
+}
+
+export interface FitDimension {
+  grade: FitGrade;
+  score: number; // 0-100
+  notes: string;
+}
+
+export interface JobFitResult {
+  overallGrade: FitGrade;
+  overallScore: number;
+  recommendation: FitRecommendation;
+  dimensions: {
+    roleAlignment: FitDimension;
+    skillsMatch: FitDimension;
+    levelFit: FitDimension;
+    compensationSignals: FitDimension;
+    personalization: FitDimension;
+    interviewReadiness: FitDimension;
+  };
+  topStrengths: string[];
+  keyGaps: string[];
+  tailoringTips: string[];
+  interviewFocus: string[];
+  processingTimeMs: number;
+  modelId: string;
+}
+
+export interface JobFitResponse extends JobFitResult {
+  requestId: string;
+}
+
 // ── RAG Pipeline Types ────────────────────────────────────────────────────────
 
 export interface VectorDocument {

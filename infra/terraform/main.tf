@@ -179,6 +179,20 @@ resource "aws_lambda_function" "deleter" {
   tags = local.tags
 }
 
+# ── Lambda: POST /evaluate (Job Fit Evaluator) ────────────────────────────────
+
+resource "aws_lambda_function" "evaluator" {
+  filename      = "../../function.zip"
+  function_name = "${local.prefix}-evaluator"
+  role          = aws_iam_role.lambda.arn
+  handler       = "handlers/evaluateHandler.handler"
+  runtime       = "nodejs20.x"
+  timeout       = 60   # single Bedrock call with large context
+  memory_size   = 512
+  environment { variables = local.lambda_env }
+  tags = local.tags
+}
+
 # ── API Gateway HTTP API ───────────────────────────────────────────────────────
 
 resource "aws_apigatewayv2_api" "main" {
@@ -227,6 +241,13 @@ resource "aws_apigatewayv2_integration" "deleter" {
   integration_method = "POST"
 }
 
+resource "aws_apigatewayv2_integration" "evaluator" {
+  api_id             = aws_apigatewayv2_api.main.id
+  integration_type   = "AWS_PROXY"
+  integration_uri    = aws_lambda_function.evaluator.invoke_arn
+  integration_method = "POST"
+}
+
 # Routes
 
 resource "aws_apigatewayv2_route" "classify" {
@@ -251,6 +272,12 @@ resource "aws_apigatewayv2_route" "delete_document" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "DELETE /documents/{documentId}"
   target    = "integrations/${aws_apigatewayv2_integration.deleter.id}"
+}
+
+resource "aws_apigatewayv2_route" "evaluate" {
+  api_id    = aws_apigatewayv2_api.main.id
+  route_key = "POST /evaluate"
+  target    = "integrations/${aws_apigatewayv2_integration.evaluator.id}"
 }
 
 # Lambda permissions
@@ -287,6 +314,14 @@ resource "aws_lambda_permission" "api_gw_deleter" {
   source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
 }
 
+resource "aws_lambda_permission" "api_gw_evaluator" {
+  statement_id  = "AllowAPIGatewayEvaluator"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.evaluator.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_apigatewayv2_api.main.execution_arn}/*/*"
+}
+
 # ── Outputs ───────────────────────────────────────────────────────────────────
 
 output "classify_endpoint" {
@@ -303,6 +338,10 @@ output "query_endpoint" {
 
 output "delete_endpoint" {
   value = "${aws_apigatewayv2_stage.main.invoke_url}/documents/{documentId}"
+}
+
+output "evaluate_endpoint" {
+  value = "${aws_apigatewayv2_stage.main.invoke_url}/evaluate"
 }
 
 output "vector_store_table" {
