@@ -15,7 +15,7 @@ Upload documents, ask questions, get grounded answers. No hallucinations. No per
 
 | Skill | Where it shows up |
 |---|---|
-| LLM integration & prompt engineering | `classifierService.ts`, `ragService.ts` |
+| LLM integration & prompt engineering | `classifierService.ts`, `ragService.ts`, `jobFitService.ts` |
 | Embedding models & semantic search | `embeddingService.ts`, `vectorStoreService.ts` |
 | RAG architecture (naive → production path) | Full pipeline in `ragService.ts` |
 | Serverless / cloud-native ML | Lambda + API Gateway + DynamoDB + Bedrock |
@@ -114,14 +114,16 @@ Titan Embed V2 returns L2-normalised vectors (`normalize: true`), so cosine simi
 ai-document-classifier/
 ├── src/
 │   ├── handlers/
-│   │   ├── classifyHandler.ts     # POST /classify — classify any document
-│   │   ├── indexHandler.ts        # POST /index   — classify + embed + store
-│   │   └── queryHandler.ts        # POST /query   — RAG query endpoint
+│   │   ├── classifyHandler.ts     # POST /classify  — classify any document
+│   │   ├── indexHandler.ts        # POST /index     — classify + embed + store
+│   │   ├── queryHandler.ts        # POST /query     — RAG query endpoint
+│   │   └── evaluateHandler.ts     # POST /evaluate  — AI job fit evaluator ⭐
 │   ├── services/
 │   │   ├── classifierService.ts   # AWS Bedrock Claude — structured classification
 │   │   ├── embeddingService.ts    # AWS Bedrock Titan Embed V2 — dense vectors
 │   │   ├── vectorStoreService.ts  # DynamoDB — upsert / cosine similarity search
 │   │   ├── ragService.ts          # Orchestrates embed → retrieve → generate
+│   │   ├── jobFitService.ts       # 6-block job fit scoring (career-ops inspired) ⭐
 │   │   └── s3Service.ts           # S3 document fetching
 │   ├── models/
 │   │   └── types.ts               # All TypeScript interfaces
@@ -170,6 +172,65 @@ terraform apply          # provisions S3, DynamoDB, 3 Lambdas, API Gateway
 ---
 
 ## API Reference
+
+### POST /evaluate — AI Job Fit Evaluator ⭐
+
+Inspired by the [career-ops](https://github.com/santifer/career-ops) 6-block evaluation system — the same framework used to evaluate 740+ job listings and land a role.
+
+Paste a job description and your resume. Get back a structured fit report: overall grade (A–F), 6 scored dimensions, top strengths, key gaps, tailoring tips, and interview prep focus.
+
+```bash
+curl -X POST https://<api>/dev/evaluate \
+  -H "Content-Type: application/json" \
+  -d '{
+    "jobDescription": "Senior Software Engineer — Platform team. 5+ yrs TypeScript/Node.js, AWS (Lambda, DynamoDB). Comp: $180-220k.",
+    "resumeText": "Jane Doe. Senior Engineer at Acme (4 yrs). TypeScript, Node.js, Lambda, DynamoDB. Built 1M docs/day pipeline. Led monolith→serverless migration."
+  }'
+```
+
+```json
+{
+  "requestId": "abc-123",
+  "overallGrade": "B+",
+  "overallScore": 85,
+  "recommendation": "APPLY",
+  "dimensions": {
+    "roleAlignment":       { "grade": "A",  "score": 90, "notes": "Strong match in platform engineering." },
+    "skillsMatch":         { "grade": "B+", "score": 86, "notes": "TypeScript, Lambda, DynamoDB all present." },
+    "levelFit":            { "grade": "B",  "score": 80, "notes": "4 years vs 5+ required — close enough." },
+    "compensationSignals": { "grade": "A",  "score": 92, "notes": "Stated $180–220k range aligns well." },
+    "personalization":     { "grade": "B+", "score": 84, "notes": "Document pipeline is a direct talking point." },
+    "interviewReadiness":  { "grade": "B",  "score": 78, "notes": "Strong technical base; prep system design." }
+  },
+  "topStrengths": [
+    "Hands-on AWS serverless experience (Lambda, DynamoDB, S3)",
+    "Led large-scale migration to microservices",
+    "Direct experience with high-volume document pipelines"
+  ],
+  "keyGaps": [
+    "Slightly below 5-year threshold — frame leadership impact instead",
+    "No explicit ML/AI pipeline experience mentioned"
+  ],
+  "tailoringTips": [
+    "Open with the 1M docs/day pipeline stat — directly mirrors their platform scale",
+    "Highlight the monolith-to-serverless migration as strategic leadership",
+    "Add a bullet about AI/ML tooling exposure if any exists"
+  ],
+  "interviewFocus": [
+    "System design: serverless at scale, cold start mitigation",
+    "DynamoDB data modelling and query patterns",
+    "STAR story: how you led the microservices migration"
+  ],
+  "processingTimeMs": 2180,
+  "modelId": "anthropic.claude-3-5-sonnet-20241022-v2:0"
+}
+```
+
+**Scoring weights:** skillsMatch 30% · roleAlignment 25% · levelFit 20% · personalization 10% · interviewReadiness 10% · compensationSignals 5%
+
+**Recommendation thresholds:** `APPLY` ≥ 75 · `MAYBE` 55–74 · `SKIP` < 55
+
+---
 
 ### POST /classify — Classify a document
 
